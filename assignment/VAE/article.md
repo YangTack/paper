@@ -300,9 +300,7 @@ $$
 
 - E_{z \sim q_\theta(z|x)}(\log{P_\phi(x|z)}
 &\approx
-\log{P_\phi(x|z)} \quad \\
-\text{z为采样值} \\
-\text{根据假设，}P_\phi(x|z) = \mathcal{N}(x;x^{org}, I)\qquad * \\
+\log{P_\phi(x|z)} \quad \quad \tiny{z为采样值} \\
 &= 
 \frac{1}{2}
 (x - x^{org})^2
@@ -310,7 +308,7 @@ $$
  {\frac
     {1}
     {\sqrt{2\pi}}
- } \\
+ } \quad \tiny{根据假设，}P_\phi(x|z) = \mathcal{N}(x;x^{org}, I)\qquad * \\
 
 
 &=
