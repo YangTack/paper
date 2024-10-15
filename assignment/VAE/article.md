@@ -63,9 +63,9 @@ $$
 
 &= \int_zq(z|x)*\log{\frac{P(x,z)}{P(z|x)}} \quad \text{凑KL Divergence} \\
 
-&= \int_zq(z|x)*\log{\frac{P(x,z)*q(z|x)}{(P(z|x)*q(z|x)}} \\
+&= \int_zq(z|x)*\log{\frac{P(x,z)*q(z|x)}{P(z|x)*q(z|x)}} \\
 
-&= \int_zq(z|x)*\log{\frac{q(z|x)}{P(z|x}} + \int_zq(z|x)*\log{\frac{P(x,z)}{q(z|x)}} \\
+&= \int_zq(z|x)*\log{\frac{q(z|x)}{P(z|x)}} + \int_zq(z|x)*\log{\frac{P(x,z)}{q(z|x)}} \\
 
 &= KL(q(z|x)||P(z|x)) + \int_zq(z|x)*\log{P(x,z)/q(z|x)}
 
@@ -82,6 +82,28 @@ $$
 > *An Introduction to Variational Autoencoders (2019, Diederik P. Kingma)* 论文中也给出结论，优化*ELBO*相当于优化两件事:
 > - 优化 $\log{L} = \log{P(x)}$ 似然函数
 > - 优化 $KL(q(z|x)||P(z|x))$ 使得$q(z|x)$ 与 $P(z|x)$更接近
+
+如果只是为了得到这个下界，以下方法同样可以
+
+$$
+
+\begin{align*}
+
+\log{L} &= \log{\int_zP(x, z)}  \\
+
+&= \log{\int_z\frac{P(x, z)}{q(z|x)}*q(z|x)} \\
+
+&= \log{E_{z \sim q(z|x)}(\frac{P(x, z)}{q(z|x)})} \\
+
+&\geq {E_{z \sim q(z|x)}(\log{\frac{P(x, z)}{q(z|x)})}} \qquad * \\
+
+&= ELBO
+
+\end{align*}
+
+$$
+
+> * 使用琴生不等式，能更快得到这个下界
 
 ### 2. ELBO拆分
 
