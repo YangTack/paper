@@ -67,7 +67,7 @@ $$
 
 &= \int_zq(z|x)*\log{\frac{q(z|x)}{P(z|x)}} + \int_zq(z|x)*\log{\frac{P(x,z)}{q(z|x)}} \\
 
-&= KL(q(z|x)||P(z|x)) + \int_zq(z|x)*\log{P(x,z)/q(z|x)}
+&= KL(q(z|x)||P(z|x)) + \int_zq(z|x)*\log{\frac{P(x,z)}{q(z|x)}}
 
 \end{align*}
 $$
