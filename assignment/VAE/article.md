@@ -1,4 +1,4 @@
-<font size=5dp>
+<font size=4dp>
 <div style="5%;">
 
 # VAE -- Variational Autoencoder 变分自编码器 报告
@@ -29,265 +29,117 @@
 <img src=img/struct.png width=500 />
 </div>
 
-
-由上图可知，VAE的目标是得到真实世界的分布 $P(x)$ ，
-由*Bayes*公式，$P(x) = \frac{P(x, z)}{P(z|x)}$，
-要想知道 $P(x)$ ，就需要知道 $P(z|x)$, 
-但如果要知道 $P(z|x)$，
-同样由*Bayes*公式，$P(z|x) = \frac{P(x|z)}{P(z)/P(x)}$ ，就必须知道 $P(x)$ 。
-
-因此VAE使用一个分布$q(z|x)$来近似$P(z|x)$
-
 ## VAE 假设
 
 VAE有如下假设:
 - $z \sim \mathcal{N}(0, I)$，
-隐变量服从标准正态分布
+隐变量服从标准正态分布(先验分布)
 - $P(x|z) \sim Norm \; \text{or} \; Bern$, 其他研究发现换成别的影响不大。
 
-## VAE 推导
+## Variational Inference
 
-随机变量$x$为真实世界观察到的图像序列 $\{x_1, x_2, ...\}$ 
+变分推断是VAE的理论基础
 
-### 1. ELBO推导及理解
-似然函数 $L = P(x)$
+首先对于对数似然：
 
-目标就是最大化 $L \Rightarrow max \; \log{L}$, 对数似然函数 
+$$
+\begin{align*}
+&E_{x \sim D} ( \log { ( p_\theta (x) ) } ) \\
+&\approx N^{-1} * \sum_i^N { \log { ( p_\theta (x_i) ) } }
+\end{align*}
+$$
+
+能取最大，其中$\theta$为模型参数
+
+接下来对于单个样本$x$进行推导
+
+$$
+
+p( x ) = { p( x, z ) \over p( z | x ) } \\
+
+$$
+
+对于含有隐变量$z$的模型来说，$p( x, z ) = p( x | z ) * p( z )$，其中只有$p( x | z )$ 作为重构项带有模型参数，$p( z )$，没有模型参数。
+
+换句话说$p( x, z )$是我们可以处理的，而后验概率$p( z | x )$不可解，因为其依赖于$p( x )$，而$p( x )$正是我们需要求解的。
+
+Variational Inference 则是以一个简单分布$q( z )$代替$p( z | x )$
+
+### 1. ELBO推导
 
 $$ 
-\begin{align*}
-
-\log{L} &= \log{P(x)}*\int_zq(z|x)  \\
-
-&= \int_z\log{P(x)}*q(z|x) \quad \text{引入P(z|x)} \\
-
-&= \int_zq(z|x)*\log{\frac{P(x,z)}{P(z|x)}} \quad \text{凑KL Divergence} \\
-
-&= \int_zq(z|x)*\log{\frac{P(x,z)*q(z|x)}{P(z|x)*q(z|x)}} \\
-
-&= \int_zq(z|x)*\log{\frac{q(z|x)}{P(z|x)}} + \int_zq(z|x)*\log{\frac{P(x,z)}{q(z|x)}} \\
-
-&= KL(q(z|x)||P(z|x)) + \int_zq(z|x)*\log{\frac{P(x,z)}{q(z|x)}}
-
-\end{align*}
-$$
-
-由于 $KL(q(z|x)||P(z|x)) \geq 0$ 当且仅当两个分布完全一样的时为0
-
-得 $\log{L} \geq \int_zq(z|x)*\log{\frac{P(x,z)}{q(z|x)}}$ 
-> 后者被称为*ELBO*--*Evidence Lower Bound*
->
-> 由于 $\log{L}$ 有上界，当尽量增大*ELBO*时，$KL(q(z|x)||P(z|x))$ 会相应减小
->
-> *An Introduction to Variational Autoencoders (2019, Diederik P. Kingma)* 论文中也给出结论，优化*ELBO*相当于优化两件事:
-> - 优化 $\log{L} = \log{P(x)}$ 似然函数
-> - 优化 $KL(q(z|x)||P(z|x))$ 使得$q(z|x)$ 与 $P(z|x)$更接近
-
-如果只是为了得到这个下界，以下方法同样可以
-
-$$
 
 \begin{align*}
 
-\log{L} &= \log{\int_zP(x, z)}  \\
+\log { ( p( x ) ) } &= \log{ \int_z p( x, z ) dz } \\
 
-&= \log{\int_z\frac{P(x, z)}{q(z|x)}*q(z|x)} \\
+& = \log { \int_z q( z ) { p( x, z ) \over q( z ) } dz } \\
 
-&= \log{E_{z \sim q(z|x)}(\frac{P(x, z)}{q(z|x)})} \\
+& =  \log { E_{ z \sim q( z ) } ( { p( x, z ) \over q( z ) }  ) } \\
 
-&\geq {E_{z \sim q(z|x)}(\log{\frac{P(x, z)}{q(z|x)})}} \qquad * \\
+& \geq  E_{ z \sim q( z ) } ( \log { p( x, z ) \over q( z ) }  ) \\
 
-&= ELBO
+& = E_{ z \sim q( z ) } ( \log { p( x, z ) } ) + H( q( z ) ) \qquad \small { (ELBO) } \\
 
 \end{align*}
 
 $$
 
-> * 使用琴生不等式，能更快得到这个下界
+接下来，关注$q( z )$与$p( z | x )$之间的距离
 
-### 2. ELBO拆分
+$$
+
+\begin{align*}
+    
+KL( q( z ) || p( z | x ) ) & = \int_z q( z ) \log { q( z ) \over p( z | x ) } dz  \\
+
+& = \log p( x ) - H_{ z \sim q( z ) } - E_{ z \sim q( z ) } ( \log { p( x, z ) } ) \\
+
+& = \log p( x ) - ELBO
+
+\end{align*}
+
+$$
+
+所以，对于任取的$q( z )$而言，ELBO能取的最大值即是$\log p( x )$
+
+以下即为实际优化任务
+> - 最大化ELBO 
+> - 使 $q( z )$与$p( z | x )$尽量接近 
+
+### 2. $q( z )$ 分布
 
 由上可知
 
-可设我们优化目标 $min(L) = min(-ELBO) = min(-\int_zq(z|x)*\log{\frac{P(x,z)}{q(z|x)}})$
+$q( z )$分布可以取得尽量简单，使得我们可以处理
+
+由于$q( z )$与$p( z | x )$需要尽量接近，$q( z )$最好也是需要依赖于$x$，
+即$q( z ) \triangleq q( z | x )$
+
+可以取$q( z | x ) = q_\phi( z | x )$对于每个真实数据采样$x_i$有不同的分布参数$\phi_i$，
+每次更新模型时，先对每个$\phi_i$进行更新，之后对$\theta$进行更新。
+
+但是这种方法需要的计算资源以及存储资源太大，为了简化，用神经网络定义函数$f_\lambda(x_i) \rightarrow \phi_i$，
+进行取舍，其中$\lambda$为神经网络的参数，$q_\phi( z | x ) = q_{ f_\lambda } ( z | x )$
+
+### 3. 优化ELBO
 
 $$
-\begin{align*}
-L &= -\int_zq(z|x)*\log{\frac{P(z)}{q(z|x)}} - \int_zq(z|x)*\log{P(x|z)}  \\
-&= KL(q(z|x)||P(z)) - E_{z \sim q(z|x)}(\log{P(x|z)} \\
-\end{align*}
-$$
-我们使用神经网络逼近$q(z|x) \rightarrow q_\theta(z|x)$ 与 $P(x|z) \rightarrow P_\phi(x|z)$，其中 $\theta$ 和 $\phi$ 为这两个神经网络的参数
 
-> $q_\theta(z|x)$ 就是Encoder
->
-> $P_\phi(x|x)$ 就是Decoder
-
-此时
-
-$$
-\begin{align*}
-L_{\theta,\phi} &= KL(q_\theta(z|x)||P(z)) - E_{z \sim q_\theta(z|x)}(\log{P_\phi(x|z)} \\
-\end{align*}
-$$
-
-#### KL Divergence 部分推导
-
-对于$KL(q_\theta(z|x)||P(z))$项，需要让其尽量小
-
-根据之前的假设 $z \sim \mathcal{N}(0, I)$，
-可知$q_\theta(z|x)$也为正态分布。
-
-可设$q_\theta(z|x) \sim \mathcal{N}(\mu_\theta, \Sigma_\theta)$，
-其中$\mu_\theta = (\mu_1, \mu_2, ..., \mu_k)^T$，
-$\Sigma_\theta$为$z$的协方差矩阵，
-
-即$\Sigma_{\theta\; i,j} = E((z_i - \mu_i)*(z_j - \mu_j)) = Cov(z_i, z_j)$，
-
-又根据假设$z$各个维度相互独立，
-$\Sigma_\theta = diag(\sigma_1, \sigma_2, ..., \sigma_k)$
-
-所以可得
-
-$$
 \begin{align*}
 
-KL(q_\theta(z|x)||P(z)) &=
- \int_{z}
- {
-    q_\theta(z|x) * \log
-    {
-        \frac
-        {
-            \prod_{i=0}^{k}
-            {
-                \frac{1}{\sqrt{2\pi\sigma^2_i}}
-                e^{-\frac{1}{2}(\frac{z_i-\mu_i}{\sigma_i})^2}
-            }
-        }
-        {
-            \prod_{i=0}^{k}
-            {
-                \frac{1}{\sqrt{2\pi}}
-                e^{-\frac{1}{2}z_i^2}
-            }
-        }
-    }
-} \\
+ELBO &= E_{ z \sim q( z | x ) } ( \log { p( x, z ) } ) + H( q( z ) ) \\
 
-
-
-&= \int_{z}
-{
-    q_\theta(z|x)*
-    \sum_{i=0}^{k}
-    \{
-        -\log{\sigma_i}
-        - \frac{1}{2}
-        [
-            (\frac{z_i - \mu_i}{\sigma_i})^2
-            - z_i^2
-        ]
-    \}
-} \\
-
-
-&= \sum_{i=0}^{k}
-{
-    \int_{z_i}
-    {
-        q_\theta(z|x)* 
-        \{
-            -\log{\sigma_i}
-            - \frac{1}{2}
-            [
-                (\frac{z_i - \mu_i}{\sigma_i})^2
-                - z_i^2
-            ]
-        \}
-    }
-} \\
-
-&= \sum_{i=0}^{k}
-{
-    \int_{z_i}{
-        q_\theta(z_i|x)* 
-        \{
-            -\log{\sigma_i}
-            - \frac{1}{2}
-            [
-                (\frac{z_i - \mu_i}{\sigma_i})^2
-                - z_i^2
-            ]
-        \}
-    }
-} \\
-
-&= \sum_{i=0}^{k}
-{
-    -\log{\sigma_i}
-    -\frac{1}{2}
-    [
-        \frac{1}{\sigma_i^2}
-        D_{z_i \sim q_\theta(z_i|x)}(z_i)
-        -E(z_i^2)
-    ]
-} \\
-
-&= \sum_{i=0}^{k}
-{
-    -\log{\sigma_i}
-    -\frac{1}{2}
-    (
-        1
-        -\mu_i^2
-        -\sigma_i^2
-    )
-} \\
-
-&= 
-\frac{1}{2}
-\sum_{i=0}^{k}
-\{
-    \mu_i^2
-    +\sigma_i^2
-    -\log{\sigma_i^2}
-    - 1
-\}
-
+& = E_{ z \sim q( z | x ) } ( \log { p( x | z ) } ) - KL( q( z | x ) || p( z ) )
+    
 \end{align*}
+
 $$
 
-$k$为隐变量的维度,
-
-设计*Encoder*输出$\mu_\theta, \log{\sigma_\theta}$，
-
-可得第一部分*loss*为
-$$
-\frac{1}{2}
-\sum_{i=0}^{k}
-\{
-    \mu_i^2
-    +\sigma_i^2
-    -\log{\sigma_i^2}
-    - 1
-\}
-$$
-
-#### 重构误差部分推导
-
-对于$- E_{z \sim q_\theta(z|x)}(\log{P_\phi(x|z)}$项，需要让其尽量小
-
-由于这一项涉及到对$z$的期望计算，
-并且对$z$积分是不可求的。
-
-解决方法一般为蒙特卡罗方法，即对$z$进行采样，将采样值作为期望值，并且，蒙特卡洛方法是无偏的。
-
-但是直接采样是无法进行反向传播更新$\phi$和$\theta$的，
-所以注意到$q_\theta(z|x)$为正态分布，
-从$q_\theta(z|x)$中采样相当于从$\mathcal{N}(0, I)$中采样$\epsilon \sim \mathcal{N}(0, I)$，
-再$z = \epsilon * \sigma_\theta + \mu_\theta$作为采样值，
-论文中将此技术称为重参数化技术(Reparameterization Trick)
+ELBO对于$\theta$做梯度上升比较容易，期望项使用Monte Carlo采样，KL项不含$\theta$。
+但是对于$\phi$也就是$\lambda$做梯度上升时直接使用Monte Carlo采样就会导致方差过大，因为$z \sim q( z | x )$ 依赖于 $\lambda$。
+VAE中使用重采样的方法使得$E_{ z \sim q( z | x ) } ( \log { p( x | z ) } ) = E_\epsilon( \log {p( x | z( \epsilon ) )} )$，$\epsilon$是一个固定分布，
+此时期望不再依赖于 $\lambda$ ，就可以做Monte Carlo采样。
 
 <div align="center">
 <img src=img/reparameterize.png heigh=300 />
@@ -295,46 +147,18 @@ $$
 
 接下来推导此项
 
+### 4. VAE
+
+VAE中假设$p( z )$是多维标准正态分布，由于ELBO中$KL( q( z | x ) || p( z ) )$要尽量小，所以$q( z | x )$可以采用多维正态分布，$f_\lambda$返回$q( z | x )$的均值$\mu( x )$和对数方差$\log \sigma^2( x )$
+
+此时ELBO
+
 $$
+
 \begin{align*}
-
-- E_{z \sim q_\theta(z|x)}(\log{P_\phi(x|z)}
-&\approx
-\log{P_\phi(x|z)} \quad \quad \tiny{z为采样值} \\
-&= 
-\frac{1}{2}
-(x - x^{org})^2
- - \log
- {\frac
-    {1}
-    {\sqrt{2\pi}}
- } \quad \tiny{根据假设，}P_\phi(x|z) = \mathcal{N}(x;x^{org}, I)\qquad * \\
-
-
-&=
-\frac{1}{2}
-(x - x^{org})^2
-+C\\
-
-\end{align*}
-$$
-
-> \* 处结论论文中并没有给出解释，查阅相关资料后
->
-> 根据 https://stats.stackexchange.com/questions/540092/how-do-we-get-to-the-mse-in-the-loss-function-for-a-variational-autoencoder 的回答
->
-> $P_\phi(x|z)$中的方差$\hat{\sigma}^2$是一个超参数，对结果影响不大，一般取$I$即可
->
-> 而均值$\hat{\mu}$根据分布是从$z$重建$x$，理所当然应该为$x^{org}$，也可以根据概率公式$E(\hat{\mu}) = E_z(E_{x \sim P_\phi(x|z)}(x)) = E(x) = x^{org}$
-
-### 结论
-
-根据以上推导 
-
-损失函数
-
-$$
-L_{\sigma, \phi} = 
+    
+ELBO & = E_{ z \sim q( z | x ) } ( \log { p( x | z ) } ) - KL( q( z | x ) || p( z ) ) \\
+& = E_{ z \sim q( z | x ) } ( \log { p( x | z ) } ) - 
 \frac{1}{2}
 \sum_{i=0}^{k}
 \{
@@ -342,13 +166,29 @@ L_{\sigma, \phi} =
     +\sigma_i^2
     -\log{\sigma_i^2}
     - 1
-\}
-+
-\frac{1}{2}
-(x - x^{org})^2
+\} \\
+
+\end{align*} \\
+
+\begin{align*}
+    
+E_{ z \sim q( z | x ) } ( \log { p( x | z ) } ) 
+
+& = E_\epsilon( \log p(x | x, \epsilon ) ) \\
+
+& \approx \log ( p( x | x, \epsilon ) ) \\
+
+& \propto -(\hat{x} - x)^2
+
+\end{align*}
+
 $$
 
-其意义为既**减少编码器与$z$分布的误差**又**减少重构$x$时的误差**
+其中$k$为$z$的维度
 
+总结以上
 
-</div>
+变分推断是使用简单分布$q( z )$近似$p( z | x )$使得$p( x )$可以求出。
+
+在VAE中用于近似$p( z | x )$的分布$q( x | z )$为多维正态分布，其参数由$f_\lambda$给出，
+$f_\lambda$在VAE结构中也是Encoder的结构，而$p( x | z )$为Decoder。
